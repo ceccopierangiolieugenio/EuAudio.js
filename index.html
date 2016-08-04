@@ -1,0 +1,341 @@
+<html>
+<body>
+<h1>EuAudio.js</h1>
+<h2>(EuAudio) simple audio test</h2>
+<input type="file" id="audioLoad" />
+<button type="button" id="play"      disabled>Play</button>
+<button type="button" id="playRev"   disabled>Play Reverse</button>
+<button type="button" id="playTest"  disabled>Play Js (DCT)</button>
+<button type="button" id="playTest1" disabled>Play Js (DCT) Overlap</button><br>
+<label>WindowExp(2^x):<input type="text" id="windowExp" value=12 /></label>,
+<label>Samples:<input  type="text" id="samples" value=2000 /></label>, 
+<label>Overlap:<input  type="text" id="overlap" value=1000 /></label><br>
+<label>Fade In:<input  type="text" id="fadein"  value=500  /></label>,
+<label>Fade Out:<input type="text" id="fadeout" value=500  /></label><br>
+<label><input type='checkbox' id='stcode' value='0'>Shadertoy Code</label>
+
+<pre id='EuAudio.Log'   style="border-style: solid;"></pre>
+<pre id='EuAudio.Code'  style="border-style: solid;"></pre>
+<pre id='EuAudio.Code1' style="border-style: solid;"></pre>
+<script type="text/javascript" src="https://gist.github.com/antimatter15/0349ca7d479236fdcdbb/raw/aa74bbaf4a1fd3a65d66ae362a755ed0ce72837c/minifft.js"></script>
+<script type="text/javascript" src="https://gist.github.com/antimatter15/0349ca7d479236fdcdbb/raw/aa74bbaf4a1fd3a65d66ae362a755ed0ce72837c/minidct.js"></script>
+<script type="text/javascript" src="https://gist.github.com/antimatter15/0349ca7d479236fdcdbb/raw/aa74bbaf4a1fd3a65d66ae362a755ed0ce72837c/miniidct.js"></script>
+<script type="text/javascript">
+	var si  = document.getElementById('EuAudio.Log');
+	var st  = document.getElementById('EuAudio.Code');
+	var st1 = document.getElementById('EuAudio.Code1');
+
+	var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+	var source;
+	var data3, data3Rev, dataTest;
+
+	document.getElementById('audioLoad').onchange = function(event){
+		si.innerHTML += "Loading " + event.target.files[0].name + "<br>";
+		var reader = new FileReader();
+		reader.onload = function(){
+			var arrayBuffer = reader.result;
+			audioCtx.decodeAudioData(arrayBuffer,function(decodedData){
+				data3    = decodedData;
+				data3Rev = audioCtx.createBuffer(1 , data3.length, data3.sampleRate );
+				dataTest = audioCtx.createBuffer(1 , data3.length, data3.sampleRate );
+				document.getElementById('play').disabled = false;
+				document.getElementById('playRev').disabled = false;
+				document.getElementById('playTest').disabled = false;
+				document.getElementById('playTest1').disabled = false;
+				si.innerHTML += "Loaded " + event.target.files[0].name + "<br>";
+				si.innerHTML += "Channels:    " + data3.numberOfChannels + "<br>";
+				si.innerHTML += "Samples:     " + data3.length + "<br>";
+				si.innerHTML += "Sample Rate: " + data3.sampleRate + "<br>";
+			});
+		};
+		reader.readAsArrayBuffer(event.target.files[0]);
+	};
+
+	document.getElementById('play').onclick = function(){
+		source = audioCtx.createBufferSource();
+		source.buffer = data3;
+		source.connect(audioCtx.destination);
+		source.playbackRate.value = 1.0;
+		source.loop = false;
+		source.start(0);
+	};
+
+	document.getElementById('playRev').onclick = function(){
+		source = audioCtx.createBufferSource();
+
+		// Create example data to test
+		var datai = data3.getChannelData(0);
+		var datao = data3Rev.getChannelData(0);
+		
+		// Get data byte size, allocate memory on Emscripten heap, and get pointer
+		var nDataBytes = datai.length * datai.BYTES_PER_ELEMENT;
+
+		for (var i=0; i<datai.length; i++) datao[i]=datai[datai.length-i-1];	
+		
+		source.buffer = data3Rev;
+		source.connect(audioCtx.destination);
+		source.playbackRate.value = 1.0;
+		source.loop = false;
+		source.start(0);
+	};
+
+	document.getElementById('playTest').onclick = function(){
+		source = audioCtx.createBufferSource();
+
+		// Create example data to test
+		var datai = data3.getChannelData(0);
+		var datao = dataTest.getChannelData(0);
+		
+		// Get data byte size, allocate memory on Emscripten heap, and get pointer
+		var nDataBytes = datai.length * datai.BYTES_PER_ELEMENT;
+
+		processSignal_01(datai,datao);
+		
+		source.buffer = dataTest;
+		source.connect(audioCtx.destination);
+		source.playbackRate.value = 1.0;
+		source.loop = false;
+		source.start(0);
+	};
+
+	document.getElementById('playTest1').onclick = function(){
+		source = audioCtx.createBufferSource();
+
+		// Create example data to test
+		var datai = data3.getChannelData(0);
+		var datao = dataTest.getChannelData(0);
+		
+		// Get data byte size, allocate memory on Emscripten heap, and get pointer
+		var nDataBytes = datai.length * datai.BYTES_PER_ELEMENT;
+
+		processSignal_02_overlap(datai,datao);
+		
+		source.buffer = dataTest;
+		source.connect(audioCtx.destination);
+		source.playbackRate.value = 1.0;
+		source.loop = false;
+		source.start(0);
+	};
+
+function processSignal_01(input,output){
+	var wexp = parseInt(document.getElementById('windowExp').value);
+	var samp = parseInt(document.getElementById('samples'  ).value);
+	var stc  = document.getElementById('stcode').checked;
+	var win  = Math.pow(2,wexp);
+
+	for (var i=0; i<output.length; i++) output[i]=0.0;	
+
+	var buf = {c:0, a:[], f:[]};
+	st.innerHTML   = "Win: " + win + " , Samples: " + samp + "<br>";
+	if(stc)st1.innerHTML  = "#define M_PI 3.1415926535897932384626433832795<br><br>"
+	if(stc)st1.innerHTML += "vec2 mainSound( float time )<br>{<br>"
+	if(stc)st1.innerHTML += "float k = " + ( data3.sampleRate / win ).toFixed(3) + ";<br>";  
+	if(stc)st1.innerHTML += "float winTime = 1.0/k;<br>";  
+	if(stc)st1.innerHTML += "float sampleTime = " + Math.floor(input.length/win) + ".0/k;<br>";  
+	if(stc)st1.innerHTML += "float tm = k* mod(time,1.0/k) * M_PI;<br>";  
+	if(stc)st1.innerHTML += "vec4 sum = vec4(0);<br>";
+	for (var i=0; i<input.length-win; i+=win){
+		var a = input.slice(i, i+win);
+		if (a.length < win)
+			a.fill(0, a.length, win-1);
+		miniDCT(a);
+		/* Process the n most powerful freqs */
+		// for (var x=win/4; x<win; x++)a[x]=0;
+		var newa = a.slice(0).sort();
+		//var nth = newa[newa.length-100];
+		var nth = newa[newa.length - 1 - samp];
+		//st.innerHTML += "[ vec2(" + a[0].toFixed(3) + ",0)" ;  
+		if (i>0) if(stc)st1.innerHTML += "else ";
+		if(stc)st1.innerHTML += "if(mod(time,sampleTime)<("+(i/win+1)+".0*winTime)){<br>    ";
+		if(stc)st1.innerHTML += "sum.x+=cos(0.0)*" + a[0].toFixed(3)+";"
+		var br = 0;
+		for (var x=1; x<win; x++){
+			if(a[x]<nth)
+				a[x]=0;
+			else{
+				buf.a[buf.c] = a[x];
+				buf.f[buf.c] = x;
+				if (++buf.c==4){
+					buf.c=0;
+					if(stc)st1.innerHTML += 
+						"sum+=cos(tm*vec4(" + 
+								buf.f[0] + ".0," +
+								buf.f[1] + ".0," +
+								buf.f[2] + ".0," +
+								buf.f[3] + ".0))" +
+							"*vec4(" +
+								buf.a[0].toFixed(3) + "," +
+								buf.a[1].toFixed(3) + "," +
+								buf.a[2].toFixed(3) + "," +
+								buf.a[3].toFixed(3) + ");"
+					if (++br%8==0)
+						if(stc)st1.innerHTML += "<br>    ";  
+				}
+			}
+		}
+		for (var ii=0; ii<buf.c; ii++)
+			if(stc)st1.innerHTML += "sum.x+=cos(tm*" + buf.f[ii] + ".0)*" + a[ii].toFixed(3)+";";
+		//st.innerHTML += " ]<br><br>" ;  
+		if(stc)st1.innerHTML += "<br>}";  
+
+		miniIDCT(a)
+		output.set(a,i);
+	}
+	if(stc)st1.innerHTML += "<br>";  
+	if(stc)st1.innerHTML += "float ret = sum.x+sum.y+sum.z+sum.w;<br>ret *= 0.00005;<br>return vec2( ret,ret );<br>}"
+}
+
+function processSignal_02_overlap(input,output){
+	var wexp     = parseInt(document.getElementById('windowExp').value);
+	var samp     = parseInt(document.getElementById('samples'  ).value);
+	var overlap  = parseInt(document.getElementById('overlap'  ).value);
+	var fadein   = parseInt(document.getElementById('fadein'  ).value);
+	var fadeout  = parseInt(document.getElementById('fadeout' ).value);
+	var stc  = document.getElementById('stcode').checked;
+	var win  = Math.pow(2,wexp);
+
+	var data = [];
+
+	for (var i=0; i<output.length; i++) output[i]=0.0;	
+
+	st.innerHTML   = "Win: " + win + " , Samples: " + samp + "<br>";
+	st.innerHTML  += "Overlap: " + overlap + "<br>";
+	for (var i=0; i<input.length-win; i+=win-overlap){ // Skip the last incomplete window
+		var a = input.slice(i, i+win);
+		miniDCT(a);
+		// Process the n most powerful freqs 
+		var newa = a.slice(0).sort();
+		var nth = newa[newa.length - 1 - samp];
+		var di  =data.length;
+		data[di] = [];
+		data[di].push({a:a[0],f:0});
+		for (var x=1; x<win; x++)
+			if(a[x]>=nth)
+				data[di].push({a:a[x],f:x});
+	}
+
+	if(stc) printShaderToy(data, data3.sampleRate, win, overlap, fadein, fadeout);
+
+	for (var i=0; i<data.length; i++){
+		var a = new Float32Array(win);
+		for (var ii=0; ii<data[i].length; ii++)
+			a[data[i][ii].f] = data[i][ii].a 
+		miniIDCT(a)
+		/* output include the previous slice (unless it is the first iteration)
+			                                      i
+			                                       Overlap
+			                                      |------|
+			                                       Window 
+			                                      |------------------------|
+		 	Output: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+			a:                                    xxxxxxxxxxxxxxxxxxxxxxxxxx
+		*/
+		if (i==0){
+			output.set(a,0);
+		}else{
+			var pos = i * (win-overlap);
+			for (var ii=0; ii<overlap; ii++){
+				var factor = ii/overlap;
+				// Simple Linear Interpolation
+				var aNew = output[pos+ii]*(1.0-factor) + a[ii]*factor
+				output[pos+ii] = aNew;
+			}
+			output.set(a.slice(overlap),pos+overlap);
+		}
+	}
+	/* Fade In Out */
+	for (var ii=0; ii<fadein;  ii++) output[ii] *= ii/fadein;
+	for (var ii=0; ii<fadeout; ii++) output[i*(win-overlap)+overlap+ii-fadeout] *= 1.0-ii/fadeout;
+}
+
+
+function printShaderToySamples(data, sampleRate, win, overlap, fadein, fadeout){
+	st1.innerHTML += "float sample(float x, float tm){<br>    "
+	st1.innerHTML += "vec4 sum = vec4(0);<br>    ";
+	for (var i=0; i<data.length ; i++){
+		if (i>0) st1.innerHTML += "else ";
+		st1.innerHTML += "if(x<"+(i+1)+".0){<br>        ";
+		for (var ii=0; ii<data[i].length ; ii+=4){
+			st1.innerHTML += 
+				"sum+=cos(tm*vec4(" + 
+						(data[i][ii+0]?data[i][ii+0].f:"0") + ".0," +
+						(data[i][ii+1]?data[i][ii+1].f:"0") + ".0," +
+						(data[i][ii+2]?data[i][ii+2].f:"0") + ".0," +
+						(data[i][ii+3]?data[i][ii+3].f:"0") + ".0))" +
+					"*vec4(" +
+						(data[i][ii+0]?data[i][ii+0].a.toFixed(3):"0.0") + "," +
+						(data[i][ii+1]?data[i][ii+1].a.toFixed(3):"0.0") + "," +
+						(data[i][ii+2]?data[i][ii+2].a.toFixed(3):"0.0") + "," +
+						(data[i][ii+3]?data[i][ii+3].a.toFixed(3):"0.0") + ");"
+			if (ii%64==0)
+				st1.innerHTML += "<br>        ";  
+		}
+		st1.innerHTML += "<br>    }";  
+	}
+	st1.innerHTML += "<br>    return sum.x+sum.y+sum.z+sum.w;<br>}<br><br>"
+}
+
+function printShaderToy(data, sampleRate, win, overlap, fadeIn, fadeOut){
+        st1.innerHTML  = "/* <br>";
+        st1.innerHTML += "      Created by Eugenio Parodi - Pier/2016<br>";
+        st1.innerHTML += "      License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.<br>";
+        st1.innerHTML += "<br>";
+        st1.innerHTML += "      Code Generated using:<br>";
+        st1.innerHTML += "           https://github.com/ceccopierangiolieugenio/EuAudio.js<br>";
+        st1.innerHTML += "*/<br>";
+        st1.innerHTML += "<br>";
+	st1.innerHTML += "#define M_PI 3.1415926535897932384626433832795<br><br>"
+	printShaderToySamples(data, sampleRate, win, overlap, fadeIn, fadeOut);
+	st1.innerHTML += "vec2 mainSound( float timeOrig )<br>{<br>"
+	st1.innerHTML += "    float overlap    = " + overlap + ".0;<br>";  
+	st1.innerHTML += "    float fadeIn     = " + fadeIn + ".0;<br>";  
+	st1.innerHTML += "    float fadeOut    = " + fadeOut + ".0;<br>";  
+	st1.innerHTML += "    float win        = " + win + ".0;<br>";  
+	st1.innerHTML += "    float winMin     = win - overlap;<br>";  
+	st1.innerHTML += "    float chunks     = " + data.length + ".0;<br>";  
+	st1.innerHTML += "    float sampleRate = " + sampleRate + ".0;<br>";  
+        st1.innerHTML += "<br>";
+        st1.innerHTML += "    float winTime    = win / sampleRate ;<br>";
+        st1.innerHTML += "    float winMinTime = winMin / sampleRate ;<br>";
+        st1.innerHTML += "    float totalTime  = chunks * winMin / sampleRate ;<br>";
+        st1.innerHTML += "<br>";
+        st1.innerHTML += "    // Add some delay between any sample<br>";
+        st1.innerHTML += "    float time = mod(timeOrig+totalTime*1.5,totalTime*2.0);<br>";
+        st1.innerHTML += "    if (time > totalTime)time=0.0;<br>";
+        st1.innerHTML += "<br>";
+        st1.innerHTML += "    float sampleTime = mod(time, totalTime);<br>";
+        st1.innerHTML += "    float chunkTime  = mod(time, winMinTime);<br>";
+        st1.innerHTML += "<br>";
+        st1.innerHTML += "    float chunk = sampleTime/winMinTime;<br>";
+        st1.innerHTML += "<br>";
+        st1.innerHTML += "    float tm   = chunkTime  * M_PI / winTime;<br>";
+        st1.innerHTML += "    float tMax = winMinTime * M_PI / winTime;<br>";
+        st1.innerHTML += "<br>";
+        st1.innerHTML += "    float overFact = overlap/win;<br>";
+        st1.innerHTML += "<br>";
+        st1.innerHTML += "    // retrieve and if required interpolate two overlapping chunks<br>";
+        st1.innerHTML += "    float ret  = sample(chunk,tm);<br>";
+        st1.innerHTML += "    float fact = fract(chunk)/overFact;<br>";
+        st1.innerHTML += "    if (chunk>=1.0 && fact<1.0){<br>";
+        st1.innerHTML += "    	float rol = sample(chunk-1.0,tm+tMax);<br>";
+        st1.innerHTML += "        ret = rol * (1.0-fact) + ret*fact;<br>";
+        st1.innerHTML += "    }<br>";
+        st1.innerHTML += "<br>";
+        st1.innerHTML += "    // Fade in/out<br>";
+        st1.innerHTML += "    float fadeInFact  = fadeIn/(winMin*chunks);<br>";
+        st1.innerHTML += "    float fadeOutFact = 1.0 - fadeOut/(winMin*chunks);<br>";
+        st1.innerHTML += "    float timeFact    = mod(time,totalTime)/totalTime;<br>";
+        st1.innerHTML += "    if (timeFact < fadeInFact)  ret *= (timeFact/fadeInFact);<br>";
+        st1.innerHTML += "    if (timeFact > fadeOutFact) ret *= ((1.0-timeFact)/(1.0-fadeOutFact));<br>";
+        st1.innerHTML += "<br>";
+        st1.innerHTML += "    ret *= 0.00005;<br>";
+        st1.innerHTML += "    return vec2( ret, ret);<br>";
+        st1.innerHTML += "}<br>";
+
+}
+
+</script>
+
+</body>
+</html> 
+
