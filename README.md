@@ -5,7 +5,7 @@ Javascript Audio Processing
 ## Intro
 This is a helper tool I am developing to increase my knowledge on audio processing.
 
-It is developed after the main idea to encode an sudio sample in [ShaderToy](https://www.shadertoy.com)
+It is developed after the main idea to encode an audio sample in [ShaderToy](https://www.shadertoy.com)
 
 ## Reference
 Shadertoy Experiment: (https://www.shadertoy.com/view/4tt3R2)
