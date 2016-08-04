@@ -1,6 +1,6 @@
 # EuAudio.js
 Javascript Audio Processing
-(http://ceccopierangiolieugenio.github.io/EuAudio.js.git/)
+(http://ceccopierangiolieugenio.github.io/EuAudio.js)
 
 ## Intro
 This is a helper tool I am developing to increase my knowledge on audio processing.
