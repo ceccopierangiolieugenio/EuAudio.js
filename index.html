@@ -17,10 +17,12 @@
 <pre id='EuAudio.Log'   style="border-style: solid;"></pre>
 <pre id='EuAudio.Code'  style="border-style: solid;"></pre>
 <pre id='EuAudio.Code1' style="border-style: solid;"></pre>
-<script type="text/javascript" src="https://gist.github.com/antimatter15/0349ca7d479236fdcdbb/raw/aa74bbaf4a1fd3a65d66ae362a755ed0ce72837c/minifft.js"></script>
-<script type="text/javascript" src="https://gist.github.com/antimatter15/0349ca7d479236fdcdbb/raw/aa74bbaf4a1fd3a65d66ae362a755ed0ce72837c/minidct.js"></script>
-<script type="text/javascript" src="https://gist.github.com/antimatter15/0349ca7d479236fdcdbb/raw/aa74bbaf4a1fd3a65d66ae362a755ed0ce72837c/miniidct.js"></script>
+<script type="text/javascript" src="js/Small_Cooley-Tukey_radix-2_DIT_FFT_in_Javascript/minifft.js"></script>
+<script type="text/javascript" src="js/Small_Cooley-Tukey_radix-2_DIT_FFT_in_Javascript/minidct.js"></script>
+<script type="text/javascript" src="js/Small_Cooley-Tukey_radix-2_DIT_FFT_in_Javascript/miniidct.js"></script>
 <script type="text/javascript">
+	var version = "0.1.0";
+
 	var si  = document.getElementById('EuAudio.Log');
 	var st  = document.getElementById('EuAudio.Code');
 	var st1 = document.getElementById('EuAudio.Code1');
@@ -282,7 +284,10 @@ function printShaderToy(data, sampleRate, win, overlap, fadeIn, fadeOut){
         st1.innerHTML += "<br>";
         st1.innerHTML += "      Code Generated using:<br>";
         st1.innerHTML += "           https://github.com/ceccopierangiolieugenio/EuAudio.js<br>";
+        st1.innerHTML += "<br>";
+        st1.innerHTML += "      EuAudio.js - v."+version+"<br>";
         st1.innerHTML += "*/<br>";
+
         st1.innerHTML += "<br>";
 	st1.innerHTML += "#define M_PI 3.1415926535897932384626433832795<br><br>"
 	printShaderToySamples(data, sampleRate, win, overlap, fadeIn, fadeOut);
