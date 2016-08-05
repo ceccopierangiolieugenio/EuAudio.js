@@ -8,7 +8,7 @@ This is a helper tool I am developing to increase my knowledge on audio processi
 It is developed after the main idea to encode an audio sample in [ShaderToy](https://www.shadertoy.com)
 
 ## Reference
-Shadertoy Experiment: (https://www.shadertoy.com/view/4tt3R2)
+Shadertoy Experiment: (https://www.shadertoy.com/view/XlcGzX)
 
 Simple Audio Compression: (http://www.lukedodd.com/really-simple-audio-compression/)
 

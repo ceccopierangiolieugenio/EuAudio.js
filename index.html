@@ -323,7 +323,7 @@ function printShaderToy(data, sampleRate, win, overlap, fadeIn, fadeOut){
         st1.innerHTML += "    float fact = fract(chunk)/overFact;<br>";
         st1.innerHTML += "    if (chunk>=1.0 && fact<1.0){<br>";
         st1.innerHTML += "    	float rol = sample(chunk-1.0,tm+tMax);<br>";
-        st1.innerHTML += "        ret = rol * (1.0-fact) + ret*fact;<br>";
+        st1.innerHTML += "      ret = mix(rol,ret,fact);<br>";
         st1.innerHTML += "    }<br>";
         st1.innerHTML += "<br>";
         st1.innerHTML += "    // Fade in/out<br>";
