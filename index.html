@@ -252,7 +252,7 @@ function processSignal_02_overlap(input,output){
 
 
 function printShaderToySamples(data, sampleRate, win, overlap, fadein, fadeout){
-	st1.innerHTML += "float sample(float x, float tm){<br>    "
+	st1.innerHTML += "float sample_01(float x, float tm){<br>    "
 	st1.innerHTML += "vec4 sum = vec4(0);<br>    ";
 	for (var i=0; i<data.length ; i++){
 		if (i>0) st1.innerHTML += "else ";
@@ -319,10 +319,10 @@ function printShaderToy(data, sampleRate, win, overlap, fadeIn, fadeOut){
         st1.innerHTML += "    float overFact = overlap/win;<br>";
         st1.innerHTML += "<br>";
         st1.innerHTML += "    // retrieve and if required interpolate two overlapping chunks<br>";
-        st1.innerHTML += "    float ret  = sample(chunk,tm);<br>";
+        st1.innerHTML += "    float ret  = sample_01(chunk,tm);<br>";
         st1.innerHTML += "    float fact = fract(chunk)/overFact;<br>";
         st1.innerHTML += "    if (chunk>=1.0 && fact<1.0){<br>";
-        st1.innerHTML += "    	float rol = sample(chunk-1.0,tm+tMax);<br>";
+        st1.innerHTML += "    	float rol = sample_01(chunk-1.0,tm+tMax);<br>";
         st1.innerHTML += "      ret = mix(rol,ret,fact);<br>";
         st1.innerHTML += "    }<br>";
         st1.innerHTML += "<br>";
